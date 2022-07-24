@@ -23,7 +23,16 @@ utils.init = () => {
  * @param {object} handler - The JS Proxy handler to wrap
  */
 utils.stripProxyFromErrors = (handler = {}) => {
-    const newHandler = {}
+    const newHandler = {
+        setPrototypeOf: function (target, proto) {
+            if (proto === null)
+                throw new TypeError('Cannot convert object to primitive value')
+            if (Object.getPrototypeOf(target) === Object.getPrototypeOf(proto)) {
+                throw new TypeError('Cyclic __proto__ value')
+            }
+            return Reflect.setPrototypeOf(target, proto)
+        }
+    }
     // We wrap each trap in the handler in a try/catch and modify the error stack if they throw
     const traps = Object.getOwnPropertyNames(handler)
     traps.forEach(trap => {
@@ -266,6 +275,10 @@ utils.redirectToString = (proxyObj, originalObj) => {
                 return originalObj + '' || fallback()
             }
 
+            if (typeof ctx === 'undefined' || ctx === null) {
+                return target.call(ctx)
+            }
+
             // Check if the toString protype of the context is the same as the global prototype,
             // if not indicates that we are doing a check across different windows., e.g. the iframeWithdirect` test case
             const hasSameProto = Object.getPrototypeOf(
@@ -330,6 +343,42 @@ utils.replaceGetterWithProxy = (obj, propName, handler) => {
     utils.patchToString(proxyObj, fnStr)
 
     return true
+}
+
+/**
+ * All-in-one method to replace a getter and/or setter. Functions get and set
+ * of handler have one more argument that contains the native function.
+ *
+ * @example
+ * replaceGetterSetter(HTMLIFrameElement.prototype, 'contentWindow', handler)
+ *
+ * @param {object} obj - The object which has the property to replace
+ * @param {string} propName - The name of the property to replace
+ * @param {object} handlerGetterSetter - The handler with get and/or set
+ *                                     functions
+ * @see https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty#description
+ */
+utils.replaceGetterSetter = (obj, propName, handlerGetterSetter) => {
+    const ownPropertyDescriptor = Object.getOwnPropertyDescriptor(obj, propName)
+    const handler = { ...ownPropertyDescriptor }
+
+    if (handlerGetterSetter.get !== undefined) {
+        const nativeFn = ownPropertyDescriptor.get
+        handler.get = function () {
+            return handlerGetterSetter.get.call(this, nativeFn.bind(this))
+        }
+        utils.redirectToString(handler.get, nativeFn)
+    }
+
+    if (handlerGetterSetter.set !== undefined) {
+        const nativeFn = ownPropertyDescriptor.set
+        handler.set = function (newValue) {
+            handlerGetterSetter.set.call(this, newValue, nativeFn.bind(this))
+        }
+        utils.redirectToString(handler.set, nativeFn)
+    }
+
+    Object.defineProperty(obj, propName, handler)
 }
 
 /**
@@ -489,11 +538,8 @@ utils.makeHandler = () => ({
         apply(target, ctx, args) {
             // Let's fetch the value first, to trigger and escalate potential errors
             // Illegal invocations like `navigator.__proto__.vendor` will throw here
-            const ret = utils.cache.Reflect.apply(...arguments)
-            if (args && args.length === 0) {
-                return value
-            }
-            return ret
+            utils.cache.Reflect.apply(...arguments)
+            return value
         }
     })
 })

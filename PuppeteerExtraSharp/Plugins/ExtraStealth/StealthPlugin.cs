@@ -20,24 +20,26 @@ namespace PuppeteerExtraSharp.Plugins.ExtraStealth
         private List<PuppeteerExtraPlugin> GetStandardEvasions()
         {
             return new List<PuppeteerExtraPlugin>()
-        {
-            new WebDriver(),
-            // new ChromeApp(),
-            new ChromeSci(),
-            new ChromeRuntime(),
-            new Codec(),
-            new Languages(GetOptionByType<StealthLanguagesOptions>()),
-            new OutDimensions(),
-            new Permissions(),
-            new UserAgent(),
-            new Vendor(GetOptionByType<StealthVendorSettings>()),
-            new WebGl(GetOptionByType<StealthWebGLOptions>()),
-            new PluginEvasion(),
-            new StackTrace(),
-            new HardwareConcurrency(GetOptionByType<StealthHardwareConcurrencyOptions>()),
-            new ContentWindow(),
-            new SourceUrl()
-        };
+            {
+                new ChromeApp(),
+                new ChromeSci(),
+                new LoadTimes(),
+                new ChromeRuntime(),
+                new DefaultArgs(),
+                new Codec(),
+                new HardwareConcurrency(GetOptionByType<StealthHardwareConcurrencyOptions>()),
+                new Languages(GetOptionByType<StealthLanguagesOptions>()),
+                new Permissions(),
+                new PluginEvasion(),
+                new WebDriver(),
+                new Vendor(GetOptionByType<StealthVendorSettings>()),
+                new OutDimensions(),
+                //new UserAgent(),
+                //new WebGl(GetOptionByType<StealthWebGLOptions>()),
+                //new StackTrace(),
+                //new ContentWindow(),
+                //new SourceUrl()
+            };
         }
 
         public override ICollection<PuppeteerExtraPlugin> GetDependencies() => _standardEvasions;
